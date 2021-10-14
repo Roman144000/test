@@ -58,6 +58,9 @@ if(isset($_POST['xml'])) {
 		$product_name = $product->appendChild($product_name);
 
 	}
-
-    $xml->save(ABSPATH . '/catalog.xml');
+	
+	header("Content-type:text/xml; charset=utf-8");
+	header("Content-Disposition: attachment; filename=catalog.xml");
+	
+    $xml->save('php://output');
 }
