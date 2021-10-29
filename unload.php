@@ -15,6 +15,7 @@ add_action('admin_menu', function () {
 
 add_action('admin_enqueue_scripts', function () {
     wp_enqueue_script('unload', plugins_url('unload/unload.js'), '', '1.0', true);
+    wp_enqueue_style( 'unload', plugins_url('unload/unload.css') );
 }, 99);
 
 function page_view()
@@ -24,9 +25,8 @@ function page_view()
     <h2><?php echo get_admin_page_title() ?></h2>
 
     <form method="post" id="form">
-        <input type="hidden" name="xml" value="1">
 
-        <div style="margin-bottom: 30px;">
+        <div>
             <select name="exist">
                 <option disabled selected>Наличие товара</option>
                 <option>В наличии</option>
@@ -48,6 +48,22 @@ function unload_func()
 {
     global $wpdb;
 
+    class Product {
+        public $id;
+        public $title;
+        public $available;
+        public $price;
+        public $order;
+
+        function __construct($id, $title) {
+            $this->id = $id;
+            $this->title = $title;
+            $this->available = (get_post_meta($id, '_stock_status', true) === 'instock') ? 'true' : 'false';
+            $this->price = get_post_meta($id, '_price', true);
+            $this->order = get_post_meta($id, 'total_sales', true);
+        }
+    }
+
     $products = $wpdb->get_results("SELECT ID, post_title FROM $wpdb->posts WHERE post_type='product'");
 
     $xml = new DOMDocument('1.0', 'UTF-8');
@@ -60,38 +76,32 @@ function unload_func()
 
     foreach ($products as $p) {
 
-        $id = $p->ID;
-
-        $availability = (get_post_meta($id, '_stock_status', true) === 'instock') ? 'true' : 'false';
+        $prod = new Product($p->ID, $p->post_title);
 
         $product = $xml->createElement("Товар");
 
         $product = $catalog->appendChild($product);
 
-        $product->setAttribute("ИД", $id);
+        $product->setAttribute("ИД", $prod->id);
 
-        $product_name = $xml->createElement("Наименование", $p->post_title);
+        $product_name = $xml->createElement("Наименование", $prod->title);
 
         $product_name = $product->appendChild($product_name);
 
-        $product_availability = $xml->createElement("Наличие", $availability);
+        $product_availability = $xml->createElement("Наличие", $prod->available);
 
         $product_availability = $product->appendChild($product_availability);
 
-        $product_price = $xml->createElement("Стоимость", get_post_meta($id, '_price', true));
+        $product_price = $xml->createElement("Стоимость", $prod->price);
 
         $product_price = $product->appendChild($product_price);
 
-        $product_order = $xml->createElement("Заказы", get_post_meta($id, 'total_sales', true));
+        $product_order = $xml->createElement("Заказы", $prod->order);
 
         $product_order = $product->appendChild($product_order);
     }
 
-    header('Content-Type: text/xml');
-
-    header('Content-Disposition: attachment; filename="catalog.xml"');
-
-    $xml->save('php://output');
+    echo $xml->save('php://output');
 
     wp_die();
 }
